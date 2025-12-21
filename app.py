@@ -53,8 +53,8 @@ SENSORS_RIGHT = {
     'Middle Tip':  {'x': 4.5, 'y': 7.0},
     'Ring Tip':    {'x': 6.0, 'y': 6.2},
     'Pinky Tip':   {'x': 7.2, 'y': 4.5},
-    'Palm Center': {'x': 4.5, 'y': 3.0},
-    'Palm Base':   {'x': 4.5, 'y': 1.0}
+#    'Palm Center': {'x': 4.5, 'y': 3.0},
+#    'Palm Base':   {'x': 4.5, 'y': 1.0}
 }
 
 def get_mock_data():
@@ -107,7 +107,7 @@ def create_hand_chart(df, metric, colorscale, range_min, range_max, unit):
         text=df['Sensor'],
         textposition="top center",
         marker=dict(
-            size=55, 
+            size=30, 
             color=df[metric],
             colorscale=colorscale,
             cmin=range_min,
