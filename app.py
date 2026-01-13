@@ -6,12 +6,12 @@ import time
 import io
 
 # --- 1. CONFIGURATION ---
-st.set_page_config(layout="wide", page_title="Right Hand Monitor")
+st.set_page_config(layout="wide", page_title="Mixed Sensor Dashboard")
 
-st.title("🖐️ Right Hand Sensor Dashboard")
-st.markdown("Sensors controlled via code. Visualizing **Temperature** and **Pressure**.")
+st.title("🖐️ Mixed Sensor Dashboard")
+st.markdown("Visualizing **Temperature** and **Pressure** on a single hand.")
 
-# Custom CSS for centering
+# Custom CSS
 st.markdown("""
 <style>
     .block-container { padding-top: 2rem; }
@@ -42,70 +42,61 @@ HAND_OUTLINE_Y = [
     3.00, 2.20, 1.50, 1.00, 0.60, 0.30, 0.10, 0.05, 0.00
 ]
 
-# --- 3. SENSOR MAPPING & CONTROL ---
+# --- 3. SENSOR DEFINITIONS ---
+# We split them into two groups: Temperature Sensors and Pressure Sensors
 
-# Define locations for all possible sensors
-ALL_SENSORS = {
-#    'Thumb':      {'x': 1.5, 'y': 3.5},
-#    'Index':      {'x': 3.0, 'y': 6.5},
-    'Middle':     {'x': 4.5, 'y': 7.0},
-    'Ring Tip':   {'x': 6.0, 'y': 6.2},
-    'Ring Base':  {'x': 5.8, 'y': 4.5}, # Second sensor for Ring Finger
-#    'Pinky':      {'x': 7.2, 'y': 4.5},
+TEMP_SENSORS = {
+    'Middle':   {'x': 4.5, 'y': 7.0},
+    'Ring Tip': {'x': 6.0, 'y': 6.2}
 }
 
-# --- CONTROL PANEL (EDIT THIS LIST TO TURN SENSORS ON/OFF) ---
-# If you comment out a line, that sensor will disappear from the map.
-ENABLED_SENSORS = [
-    'Thumb',
-    'Index',
-    'Middle',
-    'Ring Tip',
-    'Ring Base',
-    'Pinky'
-]
+PRESSURE_SENSORS = {
+    'Ring Base': {'x': 5.8, 'y': 4.5}
+}
 
 # --- 4. DATA GENERATION ---
 
 def get_data():
-    """Generates random data for enabled sensors only."""
-    data = []
+    """Generates random data for the 3 specific sensors."""
+    data_temp = []
+    data_press = []
     t = time.time()
     
-    for name in ENABLED_SENSORS:
-        if name in ALL_SENSORS:
-            coords = ALL_SENSORS[name]
+    # Generate Temperature Data
+    for name, coords in TEMP_SENSORS.items():
+        # Random Temp: -20 to 60
+        base = 20 + np.sin(t + coords['x']) * 35 
+        val = np.clip(base + np.random.normal(0, 2), -20, 60)
+        data_temp.append({
+            'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val
+        })
+
+    # Generate Pressure Data
+    for name, coords in PRESSURE_SENSORS.items():
+        # Random Pressure: 0 to 50
+        base = np.abs(np.cos(t * 1.5 + coords['y'])) * 45
+        val = np.clip(base + np.random.normal(0, 2), 0, 50)
+        data_press.append({
+            'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val
+        })
             
-            # Random Temp: -20 to 60
-            base_temp = 20 + np.sin(t + coords['x']) * 35 
-            temp = np.clip(base_temp + np.random.normal(0, 2), -20, 60)
+    return pd.DataFrame(data_temp), pd.DataFrame(data_press)
 
-            # Random Pressure: 0 to 50
-            base_press = np.abs(np.cos(t * 1.5 + coords['y'])) * 45
-            press = np.clip(base_press + np.random.normal(0, 2), 0, 50)
-
-            data.append({
-                'Sensor': name,
-                'X': coords['x'],
-                'Y': coords['y'],
-                'Temperature': temp,
-                'Pressure': press
-            })
-            
-    return pd.DataFrame(data)
-
-def convert_df_to_excel(df):
+def convert_to_excel(df_t, df_p):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='SensorData')
+        if not df_t.empty:
+            df_t.to_excel(writer, index=False, sheet_name='Temperature')
+        if not df_p.empty:
+            df_p.to_excel(writer, index=False, sheet_name='Pressure')
     return output.getvalue()
 
 # --- 5. VISUALIZATION ---
 
-def create_chart(df, metric, colorscale, v_min, v_max, unit):
+def create_combined_chart(df_temp, df_press):
     fig = go.Figure()
 
-    # Draw Right Hand Outline
+    # 1. Hand Outline
     fig.add_trace(go.Scatter(
         x=RIGHT_HAND_X, 
         y=HAND_OUTLINE_Y,
@@ -115,37 +106,61 @@ def create_chart(df, metric, colorscale, v_min, v_max, unit):
         showlegend=False
     ))
 
-    # Draw Sensors
-    if not df.empty:
+    # 2. Temperature Sensors (Red/Blue Gradient)
+    if not df_temp.empty:
         fig.add_trace(go.Scatter(
-            x=df['X'],
-            y=df['Y'],
+            x=df_temp['X'],
+            y=df_temp['Y'],
             mode='markers+text',
-            text=df['Sensor'],
+            text=df_temp['Sensor'],
             textposition="top center",
             marker=dict(
-                size=45, 
-                color=df[metric],
-                colorscale=colorscale,
-                cmin=v_min,
-                cmax=v_max,
+                size=50, 
+                color=df_temp['Value'],
+                colorscale='RdBu_r',
+                cmin=-20, cmax=60,
                 showscale=True,
-                colorbar=dict(title=unit, thickness=15, x=1.02),
+                # Colorbar Position 1 (Right side)
+                colorbar=dict(title="Temp (°C)", x=1.0, len=0.7, y=0.5),
                 opacity=0.9,
                 line=dict(width=1, color='white')
             ),
-            hovertemplate=f"<b>%{{text}}</b><br>{metric}: %{{marker.color:.1f}} {unit}<extra></extra>",
+            hovertemplate="<b>%{text}</b><br>Temp: %{marker.color:.1f} °C<extra></extra>",
+            showlegend=False
+        ))
+
+    # 3. Pressure Sensors (Green Gradient)
+    if not df_press.empty:
+        fig.add_trace(go.Scatter(
+            x=df_press['X'],
+            y=df_press['Y'],
+            mode='markers+text',
+            text=df_press['Sensor'],
+            textposition="bottom center", # Text below to avoid overlap
+            marker=dict(
+                size=50,
+                symbol='circle', # You could change shape if you wanted
+                color=df_press['Value'],
+                colorscale='Greens',
+                cmin=0, cmax=50,
+                showscale=True,
+                # Colorbar Position 2 (Further Right)
+                colorbar=dict(title="Pressure", x=1.15, len=0.7, y=0.5),
+                opacity=0.9,
+                line=dict(width=2, color='yellow') # Yellow border to distinguish Pressure
+            ),
+            hovertemplate="<b>%{text}</b><br>Pressure: %{marker.color:.1f}<extra></extra>",
             showlegend=False
         ))
 
     fig.update_layout(
-        title=f"Right Hand - {metric}",
+        title="Live Sensor Map",
         xaxis=dict(range=[0, 9], visible=False),
         yaxis=dict(range=[0, 8], visible=False, scaleanchor="x", scaleratio=1),
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
-        margin=dict(l=10, r=10, t=40, b=10),
-        height=450
+        margin=dict(l=10, r=100, t=40, b=10), # Extra right margin for colorbars
+        height=600
     )
     return fig
 
@@ -155,42 +170,34 @@ placeholder = st.empty()
 dl_btn_spot = st.sidebar.empty()
 
 while True:
-    df = get_data()
+    df_temp, df_press = get_data()
     unique_key = int(time.time() * 1000)
 
-    # Excel Download Button
-    if not df.empty:
-        excel_data = convert_df_to_excel(df)
-        dl_btn_spot.download_button(
-            label="📥 Download Excel",
-            data=excel_data,
-            file_name=f"sensor_data_{unique_key}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key=f"dl_{unique_key}"
-        )
+    # Excel Download
+    excel_data = convert_to_excel(df_temp, df_press)
+    dl_btn_spot.download_button(
+        label="📥 Download Excel",
+        data=excel_data,
+        file_name=f"mixed_sensor_data_{unique_key}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key=f"dl_{unique_key}"
+    )
 
     with placeholder.container():
         # KPI Metrics
-        k1, k2 = st.columns(2)
-        if not df.empty:
-            avg_t = df['Temperature'].mean()
-            avg_p = df['Pressure'].mean()
-            k1.metric("Avg Temp", f"{avg_t:.1f} °C")
-            k2.metric("Avg Pressure", f"{avg_p:.1f}")
+        c1, c2 = st.columns(2)
+        if not df_temp.empty:
+            avg_t = df_temp['Value'].mean()
+            c1.metric("Avg Temp", f"{avg_t:.1f} °C")
         
+        if not df_press.empty:
+            avg_p = df_press['Value'].mean()
+            c2.metric("Avg Pressure", f"{avg_p:.1f}")
+
         st.divider()
 
-        # Visualization Columns
-        c1, c2 = st.columns(2)
-        
-        with c1:
-            # Temperature (Blue -> Red)
-            fig_t = create_chart(df, 'Temperature', 'RdBu_r', -20, 60, '°C')
-            st.plotly_chart(fig_t, use_container_width=True, key=f"t_{unique_key}")
-
-        with c2:
-            # Pressure (Light Green -> Dark Green)
-            fig_p = create_chart(df, 'Pressure', 'Greens', 0, 50, 'Psi')
-            st.plotly_chart(fig_p, use_container_width=True, key=f"p_{unique_key}")
+        # Single Combined Chart
+        fig = create_combined_chart(df_temp, df_press)
+        st.plotly_chart(fig, use_container_width=True, key=f"main_chart_{unique_key}")
 
     time.sleep(0.5)
