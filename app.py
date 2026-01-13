@@ -46,12 +46,12 @@ HAND_OUTLINE_Y = [
 
 # Define locations for all possible sensors
 ALL_SENSORS = {
-    'Thumb':      {'x': 1.5, 'y': 3.5},
-    'Index':      {'x': 3.0, 'y': 6.5},
+#    'Thumb':      {'x': 1.5, 'y': 3.5},
+#    'Index':      {'x': 3.0, 'y': 6.5},
     'Middle':     {'x': 4.5, 'y': 7.0},
     'Ring Tip':   {'x': 6.0, 'y': 6.2},
     'Ring Base':  {'x': 5.8, 'y': 4.5}, # Second sensor for Ring Finger
-    'Pinky':      {'x': 7.2, 'y': 4.5},
+#    'Pinky':      {'x': 7.2, 'y': 4.5},
 }
 
 # --- CONTROL PANEL (EDIT THIS LIST TO TURN SENSORS ON/OFF) ---
