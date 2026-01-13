@@ -185,4 +185,12 @@ while True:
         
         with c1:
             # Temperature (Blue -> Red)
-            fig_t = create_chart(df, 'Temperature', 'RdBu_r', -20, 60, '
+            fig_t = create_chart(df, 'Temperature', 'RdBu_r', -20, 60, '°C')
+            st.plotly_chart(fig_t, use_container_width=True, key=f"t_{unique_key}")
+
+        with c2:
+            # Pressure (Light Green -> Dark Green)
+            fig_p = create_chart(df, 'Pressure', 'Greens', 0, 50, 'Psi')
+            st.plotly_chart(fig_p, use_container_width=True, key=f"p_{unique_key}")
+
+    time.sleep(0.5)
