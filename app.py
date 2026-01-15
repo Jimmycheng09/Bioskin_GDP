@@ -73,44 +73,24 @@ def get_data():
         # Random Pressure: 0 to 50
         base = np.abs(np.cos(t * 1.5 + coords['y'])) * 45
         val = np.clip(base + np.random.normal(0, 2), 0, 50)
-
         data_press.append({
-
             'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val
-
         })
-
-            
-
+         
     return pd.DataFrame(data_temp), pd.DataFrame(data_press)
 
-
-
 def convert_to_excel(df_t, df_p):
-
     output = io.BytesIO()
-
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-
         if not df_t.empty:
-
             df_t.to_excel(writer, index=False, sheet_name='Temperature')
-
         if not df_p.empty:
-
             df_p.to_excel(writer, index=False, sheet_name='Pressure')
-
     return output.getvalue()
 
-
-
 # --- 5. VISUALIZATION ---
-
-
-
 def create_combined_chart(df_temp, df_press):
     fig = go.Figure()
-
     # 1. Hand Outline
     fig.add_trace(go.Scatter(
         x=RIGHT_HAND_X, 
@@ -198,78 +178,38 @@ def create_combined_chart(df_temp, df_press):
     )
     return fig
 
-
-
 # --- 6. MAIN LOOP ---
-
-
-
 placeholder = st.empty()
-
 dl_btn_spot = st.sidebar.empty()
 
-
-
 while True:
-
     df_temp, df_press = get_data()
-
     unique_key = int(time.time() * 1000)
 
-
-
     # Excel Download
-
     excel_data = convert_to_excel(df_temp, df_press)
-
     dl_btn_spot.download_button(
-
         label="📥 Download Excel",
-
         data=excel_data,
-
         file_name=f"mixed_sensor_data_{unique_key}.xlsx",
-
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-
         key=f"dl_{unique_key}"
-
     )
 
-
-
     with placeholder.container():
-
         # KPI Metrics
-
         c1, c2 = st.columns(2)
-
         if not df_temp.empty:
-
             avg_t = df_temp['Value'].mean()
-
             c1.metric("Avg Temp", f"{avg_t:.1f} °C")
-
-        
-
+      
         if not df_press.empty:
-
             avg_p = df_press['Value'].mean()
-
             c2.metric("Avg Pressure", f"{avg_p:.1f}")
-
-
-
         st.divider()
 
-
-
         # Single Combined Chart
-
         fig = create_combined_chart(df_temp, df_press)
-
         st.plotly_chart(fig, use_container_width=True, key=f"main_chart_{unique_key}")
-
-
 
     time.sleep(0.5)
