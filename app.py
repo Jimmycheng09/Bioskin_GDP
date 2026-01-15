@@ -91,6 +91,7 @@ def convert_to_excel(df_t, df_p):
 # --- 5. VISUALIZATION ---
 def create_combined_chart(df_temp, df_press):
     fig = go.Figure()
+
     # 1. Hand Outline
     fig.add_trace(go.Scatter(
         x=RIGHT_HAND_X, 
@@ -115,16 +116,16 @@ def create_combined_chart(df_temp, df_press):
                 colorscale='RdBu_r',
                 cmin=-20, cmax=60,
                 showscale=True,
-                # --- FIX: Move to Bottom (Horizontal) ---
+                # --- CHANGE 1: Push Temp Bar down to -0.25 ---
                 colorbar=dict(
                     title="Temp (°C)", 
-                    orientation='h',  # Horizontal
-                    y=-0.15,          # Position below the chart
-                    x=0.5,            # Center it
+                    orientation='h',
+                    y=-0.25,          # Was -0.15, now lower
+                    x=0.5,
                     xanchor='center',
-                    len=0.9,          # Length relative to chart width
+                    len=0.9,
                     thickness=15,
-                    title_side='top'  # Title above the bar
+                    title_side='top'
                 ),
                 opacity=0.9,
                 line=dict(width=1, color='white')
@@ -148,12 +149,12 @@ def create_combined_chart(df_temp, df_press):
                 colorscale='Greens',
                 cmin=0, cmax=50,
                 showscale=True,
-                # --- FIX: Move to Bottom (Stacked below Temp) ---
+                # --- CHANGE 2: Push Pressure Bar down to -0.55 ---
                 colorbar=dict(
                     title="Pressure", 
-                    orientation='h',  # Horizontal
-                    y=-0.35,          # Position further below Temp bar
-                    x=0.5,            # Center it
+                    orientation='h',
+                    y=-0.55,          # Was -0.35, now much lower
+                    x=0.5,
                     xanchor='center',
                     len=0.9,
                     thickness=15,
@@ -172,9 +173,10 @@ def create_combined_chart(df_temp, df_press):
         yaxis=dict(range=[0, 8], visible=False, scaleanchor="x", scaleratio=1),
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
-        # --- FIX: Increase Bottom Margin for the new bars ---
-        margin=dict(l=10, r=10, t=40, b=180), 
-        height=600
+        # --- CHANGE 3: Increase Bottom Margin to 250px ---
+        # This creates the physical space to hold the lowered bars
+        margin=dict(l=10, r=10, t=40, b=250), 
+        height=700 # Increased height slightly to accommodate the gap
     )
     return fig
 
