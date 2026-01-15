@@ -153,7 +153,7 @@ def create_combined_chart(df_temp, df_press):
                 colorbar=dict(
                     title="Pressure", 
                     orientation='h',
-                    y=-0.55,          # Was -0.35, now much lower
+                    y=-0.35,          # Was -0.35, now much lower
                     x=0.5,
                     xanchor='center',
                     len=0.9,
