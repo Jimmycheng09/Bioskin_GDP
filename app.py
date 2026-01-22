@@ -4,10 +4,12 @@ import pandas as pd
 import numpy as np
 import time
 import io
-
-SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRzNUEwTvcdaOms8gu9f9zwVMGRztyOzc1JQ2vG9jc1RjTYhpRS9b2P8KWEEp7GjWJRvtURMhhQtKvj/pub?gid=0&single=true&output=csv"
+import datetime
 
 # --- 1. CONFIGURATION ---
+# Base URL (We will add a random number to this later to force updates)
+BASE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRzNUEwTvcdaOms8gu9f9zwVMGRztyOzc1JQ2vG9jc1RjTYhpRS9b2P8KWEEp7GjWJRvtURMhhQtKvj/pub?gid=0&single=true&output=csv"
+
 st.set_page_config(layout="wide", page_title="Mixed Sensor Dashboard")
 st.title("🖐️ Mixed Sensor Dashboard")
 st.markdown("Visualising **Temperature** and **Force (Capacitive & Resistive)** on a single hand.")
@@ -43,184 +45,141 @@ HAND_OUTLINE_Y = [
     3.00, 2.20, 1.50, 1.00, 0.60, 0.30, 0.10, 0.05, 0.00
 ]
 
-# --- 3. SENSOR DEFINITIONS (FIXED) ---
+# --- 3. SENSOR DEFINITIONS ---
+# Ensure these IDs match your 'Finger Number' column
 RESISTIVE_SENSORS = {
     'Force (Resistive)': {'x': 3.1, 'y': 6.5, 'finger_id' : 4}
 }
-
 PRESSURE_SENSORS = {
     'Force (Capacitive)':  {'x': 4.4, 'y': 4.5, 'finger_id' : 3} 
 }
-
-# Added missing dictionary for Resistive Sensors
 TEMP_SENSORS = {
     'Temp': {'x': 4.4, 'y': 6.5, 'finger_id' : 3}
 }
 
-@st.cache_data(ttl=1)
+# --- 4. DATA GENERATION ---
+# Removed @st.cache_data to force fresh fetch every time
 def get_data():
-    # 1. READ DATA
     try:
-        df = pd.read_csv(SHEET_URL) 
+        # CACHE BUSTING: Add a random timestamp to URL to prevent caching
+        unique_url = f"{BASE_SHEET_URL}&t={int(time.time())}"
+        
+        df = pd.read_csv(unique_url) 
+        
+        # Clean Data
         cols_to_num = ['Finger Number', 'Temperature', 'Capacitive', 'Resistive']
         for col in cols_to_num:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         
-        # This correctly gets the single latest row for each finger ID
+        # Get latest
+        if 'Finger Number' not in df.columns:
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Error: Column 'Finger Number' not found"
+            
         latest_df = df.groupby('Finger Number').tail(1).set_index('Finger Number')
-    except Exception:
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        
+        # Extract Values
+        data_temp, data_press, data_resistive = [], [], []
 
-    data_temp = []
-    data_press = []
-    data_resistive = [] 
+        def get_val(df, finger_id, col_name):
+            if df.empty or finger_id not in df.index: return 0.0
+            return float(df.loc[finger_id, col_name])
 
-    # Helper function to look up data by ID
-    def get_val(df, finger_id, col_name):
-        if df.empty or finger_id not in df.index:
-            return 0.0
-        return float(df.loc[finger_id, col_name])
+        # Map Sensors
+        for name, coords in TEMP_SENSORS.items():
+            val = get_val(latest_df, coords['finger_id'], 'Temperature')
+            data_temp.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
 
-    # --- THE FIX: REMOVED THE OUTER LOOP HERE ---
-    # We just loop through our defined sensors once.
-    
-    # 1. Temperature
-    for name, coords in TEMP_SENSORS.items():
-        val = get_val(latest_df, coords['finger_id'], 'Temperature')
-        data_temp.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
+        for name, coords in PRESSURE_SENSORS.items():
+            val = get_val(latest_df, coords['finger_id'], 'Capacitive')
+            data_press.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
 
-    # 2. Force (Capacitive)
-    for name, coords in PRESSURE_SENSORS.items():
-        val = get_val(latest_df, coords['finger_id'], 'Capacitive')
-        data_press.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
+        for name, coords in RESISTIVE_SENSORS.items():
+            val = get_val(latest_df, coords['finger_id'], 'Resistive')
+            data_resistive.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
+            
+        return pd.DataFrame(data_temp), pd.DataFrame(data_press), pd.DataFrame(data_resistive), None
 
-    # 3. Resistive Force
-    for name, coords in RESISTIVE_SENSORS.items():
-        val = get_val(latest_df, coords['finger_id'], 'Resistive')
-        data_resistive.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
-          
-    return pd.DataFrame(data_temp), pd.DataFrame(data_press), pd.DataFrame(data_resistive)
+    except Exception as e:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), str(e)
 
 def convert_to_excel(df_t, df_p, df_r):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        if not df_t.empty:
-            df_t.to_excel(writer, index=False, sheet_name='Temperature')
-        if not df_p.empty:
-            df_p.to_excel(writer, index=False, sheet_name='Force_Capacitive')
-        if not df_r.empty:
-            df_r.to_excel(writer, index=False, sheet_name='Force_Resistive')
+        if not df_t.empty: df_t.to_excel(writer, index=False, sheet_name='Temperature')
+        if not df_p.empty: df_p.to_excel(writer, index=False, sheet_name='Force_Capacitive')
+        if not df_r.empty: df_r.to_excel(writer, index=False, sheet_name='Force_Resistive')
     return output.getvalue()
 
 # --- 5. VISUALIZATION ---
 def create_combined_chart(df_temp, df_press, df_resistive):
     fig = go.Figure()
 
-    # 1. Hand Outline
+    # Hand Outline
     fig.add_trace(go.Scatter(
-        x=RIGHT_HAND_X, 
-        y=HAND_OUTLINE_Y,
-        mode='lines',
-        line=dict(color='#334155', width=3),
-        hoverinfo='skip',
-        showlegend=False
+        x=RIGHT_HAND_X, y=HAND_OUTLINE_Y,
+        mode='lines', line=dict(color='#334155', width=3),
+        hoverinfo='skip', showlegend=False
     ))
 
-    # 2. Temperature Sensors (Red/Blue Gradient) - Bar Position 1
+    # Temp
     if not df_temp.empty:
         fig.add_trace(go.Scatter(
-            x=df_temp['X'], y=df_temp['Y'],
-            mode='markers+text',
+            x=df_temp['X'], y=df_temp['Y'], mode='markers+text',
             text=df_temp['Sensor'], textposition="top center",
-            marker=dict(
-                size=50, 
-                color=df_temp['Value'],
-                colorscale='RdBu_r', cmin=-20, cmax=60,
-                showscale=True,
-                colorbar=dict(
-                    title="Temp (°C)", 
-                    orientation='h',
-                    y=-0.20,  # Top Bar
-                    x=0.5, xanchor='center',
-                    len=0.9, thickness=15, title_side='top'
-                ),
-                opacity=0.9, line=dict(width=1, color='white')
-            ),
-            hovertemplate="<b>%{text}</b><br>Temp: %{marker.color:.1f} °C<extra></extra>",
-            showlegend=False
+            marker=dict(size=50, color=df_temp['Value'], colorscale='RdBu_r', cmin=-20, cmax=60, showscale=True,
+                        colorbar=dict(title="Temp (°C)", orientation='h', y=-0.20, x=0.5, len=0.9, thickness=15),
+                        opacity=0.9, line=dict(width=1, color='white')),
+            hovertemplate="<b>%{text}</b><br>Temp: %{marker.color:.1f} °C<extra></extra>"
         ))
 
-    # 3. Force Sensors (Green Gradient) - Bar Position 2
+    # Pressure
     if not df_press.empty:
         fig.add_trace(go.Scatter(
-            x=df_press['X'], y=df_press['Y'],
-            mode='markers+text',
+            x=df_press['X'], y=df_press['Y'], mode='markers+text',
             text=df_press['Sensor'], textposition="bottom center", 
-            marker=dict(
-                size=50, symbol='circle', 
-                color=df_press['Value'],
-                colorscale='RdBu_r', cmin=0, cmax=50,
-                showscale=True,
-                colorbar=dict(
-                    title="Force (Capacitive)", 
-                    orientation='h',
-                    y=-0.40, # Middle Bar
-                    x=0.5, xanchor='center',
-                    len=0.9, thickness=15, title_side='top'
-                ),
-                opacity=0.9, line=dict(width=2, color='yellow') 
-            ),
-            hovertemplate="<b>%{text}</b><br>Force: %{marker.color:.1f}<extra></extra>",
-            showlegend=False
+            marker=dict(size=50, symbol='circle', color=df_press['Value'], colorscale='RdBu_r', cmin=0, cmax=50, showscale=True,
+                        colorbar=dict(title="Force (Cap)", orientation='h', y=-0.40, x=0.5, len=0.9, thickness=15),
+                        opacity=0.9, line=dict(width=2, color='yellow')),
+            hovertemplate="<b>%{text}</b><br>Force: %{marker.color:.1f}<extra></extra>"
         ))
 
-    # 4. Resistive Force Sensors (Orange Gradient) - Bar Position 3 (NEW)
+    # Resistive
     if not df_resistive.empty:
         fig.add_trace(go.Scatter(
-            x=df_resistive['X'], y=df_resistive['Y'],
-            mode='markers+text',
+            x=df_resistive['X'], y=df_resistive['Y'], mode='markers+text',
             text=df_resistive['Sensor'], textposition="bottom center", 
-            marker=dict(
-                size=50, symbol='square', # Using Square to differentiate
-                color=df_resistive['Value'],
-                colorscale='RdBu_r', cmin=0, cmax=100,
-                showscale=True,
-                colorbar=dict(
-                    title="Force (Resistive)", 
-                    orientation='h',
-                    y=-0.60, # Bottom Bar
-                    x=0.5, xanchor='center',
-                    len=0.9, thickness=15, title_side='top'
-                ),
-                opacity=0.9, line=dict(width=2, color='black') 
-            ),
-            hovertemplate="<b>%{text}</b><br>Force: %{marker.color:.1f}<extra></extra>",
-            showlegend=False
+            marker=dict(size=50, symbol='square', color=df_resistive['Value'], colorscale='RdBu_r', cmin=0, cmax=100, showscale=True,
+                        colorbar=dict(title="Force (Res)", orientation='h', y=-0.60, x=0.5, len=0.9, thickness=15),
+                        opacity=0.9, line=dict(width=2, color='black')),
+            hovertemplate="<b>%{text}</b><br>Resistive: %{marker.color:.1f}<extra></extra>"
         ))
 
     fig.update_layout(
         title="Live Sensor Map",
         xaxis=dict(range=[0, 9], visible=False),
         yaxis=dict(range=[0, 8], visible=False, scaleanchor="x", scaleratio=1),
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        # Increased bottom margin (b) to 380 to fit 3 bars
-        margin=dict(l=10, r=10, t=40, b=380), 
-        height=850 # Increased height 
+        plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=10, r=10, t=40, b=380), height=850
     )
     return fig
 
 # --- 6. MAIN LOOP ---
 placeholder = st.empty()
 dl_btn_spot = st.sidebar.empty()
+last_update_spot = st.sidebar.empty()
 
 while True:
-    # Get 3 dataframes now
-    df_temp, df_press, df_resistive = get_data()
+    # Fetch Data
+    df_temp, df_press, df_resistive, error_msg = get_data()
+    
     unique_key = int(time.time() * 1000)
+    current_time = datetime.datetime.now().strftime("%H:%M:%S")
+    
+    # Update Timestamp in Sidebar
+    last_update_spot.markdown(f"**Last Fetch:** {current_time}")
 
-    # Excel Download
+    # Download Button
     excel_data = convert_to_excel(df_temp, df_press, df_resistive)
     dl_btn_spot.download_button(
         label="📥 Download Excel",
@@ -231,25 +190,23 @@ while True:
     )
 
     with placeholder.container():
-        # KPI Metrics - Now 3 Columns
-        c1, c2, c3 = st.columns(3)
-        
-        if not df_temp.empty:
-            avg_t = df_temp['Value'].mean()
-            c1.metric("Temp Sensor", f"{avg_t:.1f} °C")
-       
-        if not df_press.empty:
-            avg_p = df_press['Value'].mean()
-            c2.metric("Force (Cap)", f"{avg_p:.1f} N") 
-
-        if not df_resistive.empty:
-            avg_r = df_resistive['Value'].mean()
-            c3.metric("Force (Resistive)", f"{avg_r:.1f} N")
+        if error_msg:
+            st.error(f"⚠️ Error fetching data: {error_msg}")
+            st.warning("Note: Google Sheets 'Publish to Web' updates every ~5 minutes. It is not instant.")
+        else:
+            c1, c2, c3 = st.columns(3)
             
-        st.divider()
+            val_t = f"{df_temp['Value'].mean():.1f} °C" if not df_temp.empty else "No Data"
+            val_p = f"{df_press['Value'].mean():.1f} N" if not df_press.empty else "No Data"
+            val_r = f"{df_resistive['Value'].mean():.1f} N" if not df_resistive.empty else "No Data"
 
-        # Single Combined Chart
-        fig = create_combined_chart(df_temp, df_press, df_resistive)
-        st.plotly_chart(fig, use_container_width=True, key=f"main_chart_{unique_key}")
+            c1.metric("Temp Sensor", val_t)
+            c2.metric("Force (Cap)", val_p)
+            c3.metric("Force (Resistive)", val_r)
+            
+            st.divider()
+
+            fig = create_combined_chart(df_temp, df_press, df_resistive)
+            st.plotly_chart(fig, use_container_width=True, key=f"main_chart_{unique_key}")
 
     time.sleep(2)
