@@ -5,7 +5,7 @@ import numpy as np
 import time
 import io
 
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1iSHHmBbIudjJB1ltegpp7hIziwEndlQxeCJDu5ZDr_4/edit?gid=0#gid=0"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRzNUEwTvcdaOms8gu9f9zwVMGRztyOzc1JQ2vG9jc1RjTYhpRS9b2P8KWEEp7GjWJRvtURMhhQtKvj/pub?gid=0&single=true&output=csv"
 
 # --- 1. CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Mixed Sensor Dashboard")
