@@ -143,7 +143,7 @@ def create_combined_chart(df_temp, df_press, df_resistive):
             marker=dict(
                 size=50, symbol='circle', 
                 color=df_press['Value'],
-                colorscale='Greens', cmin=0, cmax=50,
+                colorscale='RdBu_r', cmin=0, cmax=50,
                 showscale=True,
                 colorbar=dict(
                     title="Force (Capacitive)", 
@@ -167,7 +167,7 @@ def create_combined_chart(df_temp, df_press, df_resistive):
             marker=dict(
                 size=50, symbol='square', # Using Square to differentiate
                 color=df_resistive['Value'],
-                colorscale='Oranges', cmin=0, cmax=100,
+                colorscale='RdBu_r', cmin=0, cmax=100,
                 showscale=True,
                 colorbar=dict(
                     title="Force (Resistive)", 
