@@ -55,32 +55,31 @@ TEMP_SENSORS = {
     'Temp': {'x': 4.4, 'y': 6.5, 'finger_id' : 3}
 }
 
-# --- 4. DATA GENERATION ---
+# --- 4. DATA GENERATION (Returns Visualization Data AND Full History) ---
 def get_data():
     try:
-        # Cache Busting to avoid standard browser caching
         unique_url = f"{BASE_SHEET_URL}&t={int(time.time())}"
         
-        df = pd.read_csv(unique_url)
+        # 1. Read the FULL data first
+        full_df = pd.read_csv(unique_url)
         
-        if df.empty:
-            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Google Sheet is empty"
+        if full_df.empty:
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Google Sheet is empty", pd.DataFrame()
 
-        # --- THE FIX: Take the last 5 rows as a buffer ---
-        df = df.tail(5)
-        
-        # Clean Data
+        # 2. Clean Data (Apply this to the FULL dataset so the download is clean)
         cols_to_num = ['Finger Number', 'Temperature', 'Capacitive', 'Resistive']
         for col in cols_to_num:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
+            if col in full_df.columns:
+                full_df[col] = pd.to_numeric(full_df[col], errors='coerce')
         
-        if 'Finger Number' not in df.columns:
-            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Column 'Finger Number' missing"
-            
-        # --- PREVENT LOOPING: Group by Finger Number and keep only the latest ---
-        # This ensures if Finger 3 appears twice in the last 5 rows, we only use the newest entry.
-        latest_df = df.groupby('Finger Number').tail(1).set_index('Finger Number')
+        if 'Finger Number' not in full_df.columns:
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Column 'Finger Number' missing", full_df
+
+        # 3. Create the Visualization Slice (Last 5 Rows)
+        vis_df = full_df.tail(5)
+        
+        # Prevent Looping in Vis: Group by Finger Number and keep only the latest
+        latest_df = vis_df.groupby('Finger Number').tail(1).set_index('Finger Number')
         
         data_temp, data_press, data_resistive = [], [], []
 
@@ -88,7 +87,6 @@ def get_data():
             if df.empty or finger_id not in df.index: return 0.0
             return float(df.loc[finger_id, col_name])
 
-        # Map Sensors
         for name, coords in TEMP_SENSORS.items():
             val = get_val(latest_df, coords['finger_id'], 'Temperature')
             data_temp.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
@@ -101,18 +99,21 @@ def get_data():
             val = get_val(latest_df, coords['finger_id'], 'Resistive')
             data_resistive.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
             
-        return pd.DataFrame(data_temp), pd.DataFrame(data_press), pd.DataFrame(data_resistive), None
+        # Return: Vis Temp, Vis Press, Vis Res, Error, AND THE FULL DATAFRAME
+        return pd.DataFrame(data_temp), pd.DataFrame(data_press), pd.DataFrame(data_resistive), None, full_df
 
     except Exception as e:
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), str(e)
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), str(e), pd.DataFrame()
 
-def convert_to_excel(df_t, df_p, df_r):
+# --- EXCEL CONVERTER (Takes the FULL DataFrame now) ---
+def convert_to_excel(full_df):
     output = io.BytesIO()
-    # "openpyxl" must be installed in your environment/requirements.txt
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        if not df_t.empty: df_t.to_excel(writer, index=False, sheet_name='Temperature')
-        if not df_p.empty: df_p.to_excel(writer, index=False, sheet_name='Force_Capacitive')
-        if not df_r.empty: df_r.to_excel(writer, index=False, sheet_name='Force_Resistive')
+        if not full_df.empty:
+            full_df.to_excel(writer, index=False, sheet_name='Full_Sensor_History')
+        else:
+            # Create dummy sheet if empty
+            pd.DataFrame(['No Data']).to_excel(writer, sheet_name='Empty')
     return output.getvalue()
 
 # --- 5. VISUALIZATION ---
@@ -174,19 +175,22 @@ dl_btn_spot = st.sidebar.empty()
 last_update_spot = st.sidebar.empty()
 
 while True:
-    df_temp, df_press, df_resistive, error_msg = get_data()
+    # UPDATED: Now unpacks the 5th return value (full_df)
+    df_temp, df_press, df_resistive, error_msg, full_df = get_data()
+    
     unique_key = int(time.time() * 1000)
     current_time = datetime.datetime.now().strftime("%H:%M:%S")
     last_update_spot.markdown(f"**Last Fetch:** {current_time}")
 
-    # --- SAFE EXCEL GENERATION ---
-    # This prevents the app from crashing if 'convert_to_excel' fails
+    # --- EXCEL DOWNLOAD (Uses full_df now) ---
     try:
-        excel_data = convert_to_excel(df_temp, df_press, df_resistive)
+        # Convert the FULL data history to Excel
+        excel_data = convert_to_excel(full_df)
+        
         dl_btn_spot.download_button(
-            label="📥 Download Excel",
+            label="📥 Download Full History",
             data=excel_data,
-            file_name=f"mixed_sensor_data_{unique_key}.xlsx",
+            file_name=f"full_sensor_history_{unique_key}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key=f"dl_{unique_key}"
         )
@@ -201,7 +205,6 @@ while True:
             st.error(f"⚠️ Error: {error_msg}")
         else:
             c1, c2, c3 = st.columns(3)
-            # Safe mean calculation (handles empty dataframes gracefully)
             val_t = f"{df_temp['Value'].mean():.1f} °C" if not df_temp.empty else "No Data"
             val_p = f"{df_press['Value'].mean():.1f} N" if not df_press.empty else "No Data"
             val_r = f"{df_resistive['Value'].mean():.1f} N" if not df_resistive.empty else "No Data"
