@@ -55,20 +55,18 @@ TEMP_SENSORS = {
     'Temp': {'x': 4.4, 'y': 6.5, 'finger_id' : 3}
 }
 
-# --- 4. DATA GENERATION (BUFFERED 5 ROWS) ---
+# --- 4. DATA GENERATION ---
 def get_data():
     try:
-        # Cache Busting to ensure we get fresh data
+        # Cache Busting to avoid standard browser caching
         unique_url = f"{BASE_SHEET_URL}&t={int(time.time())}"
         
-        # Read the CSV
         df = pd.read_csv(unique_url)
         
-        # --- THE LOGIC: Keep a buffer of the last 5 rows ---
         if df.empty:
             return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Google Sheet is empty"
-            
-        # 1. Slice to the last 5 rows only
+
+        # --- THE FIX: Take the last 5 rows as a buffer ---
         df = df.tail(5)
         
         # Clean Data
@@ -80,15 +78,13 @@ def get_data():
         if 'Finger Number' not in df.columns:
             return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Column 'Finger Number' missing"
             
-        # 2. THE CRITICAL STEP: Prevent Looping/Duplicates
-        # Group by 'Finger Number' and take only the LAST entry for each finger.
-        # This ensures if Finger 3 appears twice in the last 5 rows, we only use the newest one.
+        # --- PREVENT LOOPING: Group by Finger Number and keep only the latest ---
+        # This ensures if Finger 3 appears twice in the last 5 rows, we only use the newest entry.
         latest_df = df.groupby('Finger Number').tail(1).set_index('Finger Number')
         
         data_temp, data_press, data_resistive = [], [], []
 
         def get_val(df, finger_id, col_name):
-            # If the finger_id isn't in our 5-row buffer, return 0
             if df.empty or finger_id not in df.index: return 0.0
             return float(df.loc[finger_id, col_name])
 
@@ -109,6 +105,14 @@ def get_data():
 
     except Exception as e:
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), str(e)
+
+def convert_to_excel(df_t, df_p, df_r):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        if not df_t.empty: df_t.to_excel(writer, index=False, sheet_name='Temperature')
+        if not df_p.empty: df_p.to_excel(writer, index=False, sheet_name='Force_Capacitive')
+        if not df_r.empty: df_r.to_excel(writer, index=False, sheet_name='Force_Resistive')
+    return output.getvalue()
 
 # --- 5. VISUALIZATION ---
 def create_combined_chart(df_temp, df_press, df_resistive):
@@ -201,4 +205,4 @@ while True:
             fig = create_combined_chart(df_temp, df_press, df_resistive)
             st.plotly_chart(fig, use_container_width=True, key=f"main_chart_{unique_key}")
 
-    time.sleep(1)
+    time.sleep(2)
