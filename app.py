@@ -4,15 +4,8 @@ import pandas as pd
 import numpy as np
 import time
 import io
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 
-# --- GOOGLE SHEETS AUTH ---
-# Load credentials and authorize
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-client = gspread.authorize(creds)
-sheet = client.open("Bioskin data").sheet1
+SHEET_URL = https://docs.google.com/spreadsheets/d/1iSHHmBbIudjJB1ltegpp7hIziwEndlQxeCJDu5ZDr_4/edit?gid=0#gid=0
 
 # --- 1. CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Mixed Sensor Dashboard")
@@ -64,11 +57,12 @@ RESISTIVE_SENSORS = {
     'Temp': {'x': 4.4, 'y': 6.5, 'finger_id' : 4}
 }
 
+@st.cache_data(ttl=3)
 # --- 4. DATA GENERATION ---
 def get_data():
 
     raw_data = sheet.get_all_values()
-    df = pd.DataFrame(raw_data[1:], columns=raw_data[0]) 
+    df = pd.read_csv(SHEET_URL) 
     cols_to_num = ['Date and Time', 'Finger Number', 'Temperature', 'Capacitive', 'Resistive', 'Timestamp']
     for col in cols_to_num:
         if col in df.columns:
