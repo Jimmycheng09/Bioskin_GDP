@@ -55,18 +55,20 @@ TEMP_SENSORS = {
     'Temp': {'x': 4.4, 'y': 6.5, 'finger_id' : 3}
 }
 
-# --- 4. DATA GENERATION ---
+# --- 4. DATA GENERATION (BUFFERED 5 ROWS) ---
 def get_data():
     try:
-        # Cache Busting
+        # Cache Busting to ensure we get fresh data
         unique_url = f"{BASE_SHEET_URL}&t={int(time.time())}"
         
-        # --- THE FIX: Load all data, but slice IMMEDIATELY to last 5 rows ---
-        # Note: We can't use 'skiprows' easily with GSheets URL because header row varies
-        # So we read it, then tail(5) it immediately.
+        # Read the CSV
         df = pd.read_csv(unique_url)
         
-        # Only keep the last 5 rows to ensure we are looking at recent data
+        # --- THE LOGIC: Keep a buffer of the last 5 rows ---
+        if df.empty:
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Google Sheet is empty"
+            
+        # 1. Slice to the last 5 rows only
         df = df.tail(5)
         
         # Clean Data
@@ -78,17 +80,19 @@ def get_data():
         if 'Finger Number' not in df.columns:
             return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Column 'Finger Number' missing"
             
-        # Group by Finger Number and get the single latest entry for each finger
-        # This prevents "looping" duplicates
+        # 2. THE CRITICAL STEP: Prevent Looping/Duplicates
+        # Group by 'Finger Number' and take only the LAST entry for each finger.
+        # This ensures if Finger 3 appears twice in the last 5 rows, we only use the newest one.
         latest_df = df.groupby('Finger Number').tail(1).set_index('Finger Number')
         
         data_temp, data_press, data_resistive = [], [], []
 
         def get_val(df, finger_id, col_name):
+            # If the finger_id isn't in our 5-row buffer, return 0
             if df.empty or finger_id not in df.index: return 0.0
             return float(df.loc[finger_id, col_name])
 
-        # Map Sensors (No outer loop here!)
+        # Map Sensors
         for name, coords in TEMP_SENSORS.items():
             val = get_val(latest_df, coords['finger_id'], 'Temperature')
             data_temp.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
@@ -105,14 +109,6 @@ def get_data():
 
     except Exception as e:
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), str(e)
-
-def convert_to_excel(df_t, df_p, df_r):
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        if not df_t.empty: df_t.to_excel(writer, index=False, sheet_name='Temperature')
-        if not df_p.empty: df_p.to_excel(writer, index=False, sheet_name='Force_Capacitive')
-        if not df_r.empty: df_r.to_excel(writer, index=False, sheet_name='Force_Resistive')
-    return output.getvalue()
 
 # --- 5. VISUALIZATION ---
 def create_combined_chart(df_temp, df_press, df_resistive):
