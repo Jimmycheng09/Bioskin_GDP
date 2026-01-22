@@ -4,6 +4,15 @@ import pandas as pd
 import numpy as np
 import time
 import io
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+# --- GOOGLE SHEETS AUTH ---
+# Load credentials and authorize
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
+client = gspread.authorize(creds)
+sheet = client.open("Bioskin data").sheet1
 
 # --- 1. CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Mixed Sensor Dashboard")
@@ -43,45 +52,54 @@ HAND_OUTLINE_Y = [
 
 # --- 3. SENSOR DEFINITIONS (FIXED) ---
 TEMP_SENSORS = {
-    'Force (Resistive)': {'x': 3.1, 'y': 6.5}
+    'Force (Resistive)': {'x': 3.1, 'y': 6.5, 'finger_id' : 3}
 }
 
 PRESSURE_SENSORS = {
-    'Force (Capacitive)':  {'x': 4.4, 'y': 4.5} 
+    'Force (Capacitive)':  {'x': 4.4, 'y': 4.5, 'finger_id' : 3} 
 }
 
 # Added missing dictionary for Resistive Sensors
 RESISTIVE_SENSORS = {
-    'Temp': {'x': 4.4, 'y': 6.5}
+    'Temp': {'x': 4.4, 'y': 6.5, 'finger_id' : 4}
 }
 
 # --- 4. DATA GENERATION ---
 def get_data():
+
+    raw_data = sheet.get_all_values()
+    df = pd.DataFrame(raw_data[1:], columns=raw_data[0]) 
+    cols_to_num = ['Date and Time', 'Finger Number', 'Temperature', 'Capacitive', 'Resistive', 'Timestamp']
+        for col in cols_to_num:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    latest_df = df.groupby('Finger Number').tail(1).set_index('Finger Number')
+            
     """Generates random data for 3 specific sensor types."""
     data_temp = []
     data_press = []
     data_resistive = [] # New list
-    
+
+    def get_val(df, finger_id, col_name):
+        if df.empty or finger_id not in df.index:
+            return 0.0
+        return float(df.loc[finger_id, col_name])
+
     t = time.time() 
-
-    # 1. Temperature
-    for name, coords in TEMP_SENSORS.items():
-        base = 20 + np.sin(t + coords['x']) * 35 
-        val = np.clip(base + np.random.normal(0, 2), -20, 60)
-        data_temp.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
-
-    # 2. Force (Capacitive)
-    for name, coords in PRESSURE_SENSORS.items():
-        base = np.abs(np.cos(t * 1.5 + coords['y'])) * 45
-        val = np.clip(base + np.random.normal(0, 2), 0, 50)
-        data_press.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
-
-    # 3. Resistive Force (New)
-    for name, coords in RESISTIVE_SENSORS.items():
-        # Random Force: 0 to 100
-        base = np.abs(np.sin(t * 2.0 + coords['x'])) * 90
-        val = np.clip(base + np.random.normal(0, 5), 0, 100)
-        data_resistive.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
+    for _, row in latest_df.iterrows():]
+        # 1. Temperature
+        for name, coords in TEMP_SENSORS.items():
+            val = get_val(latest_df, coords['finger_id'], 'Temperature')
+            data_temp.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
+    
+        # 2. Force (Capacitive)
+        for name, coords in PRESSURE_SENSORS.items():
+            val = get_val(latest_df, coords['finger_id'], 'Capacitive'
+            data_press.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
+    
+        # 3. Resistive Force (New)
+        for name, coords in RESISTIVE_SENSORS.items():
+            val = get_val(latest_df, coords['finger_id'], 'Resistive')
+            data_resistive.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
           
     return pd.DataFrame(data_temp), pd.DataFrame(data_press), pd.DataFrame(data_resistive)
 
