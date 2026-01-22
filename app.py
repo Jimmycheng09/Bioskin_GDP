@@ -52,7 +52,7 @@ PRESSURE_SENSORS = {
 
 # Added missing dictionary for Resistive Sensors
 RESISTIVE_SENSORS = {
-    'Force (Resistive)':  {'x': 4.2, 'y': 6.5} 
+    'Force (Resistive)':  {'x': 4.4, 'y': 6.5} 
 }
 
 # --- 4. DATA GENERATION ---
