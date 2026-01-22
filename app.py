@@ -85,7 +85,7 @@ def get_data():
         return float(df.loc[finger_id, col_name])
 
     t = time.time() 
-    for _, row in latest_df.iterrows():]
+    for _, row in latest_df.iterrows():
         # 1. Temperature
         for name, coords in TEMP_SENSORS.items():
             val = get_val(latest_df, coords['finger_id'], 'Temperature')
