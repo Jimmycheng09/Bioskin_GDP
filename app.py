@@ -94,7 +94,7 @@ def get_data():
     
         # 2. Force (Capacitive)
         for name, coords in PRESSURE_SENSORS.items():
-            val = get_val(latest_df, coords['finger_id'], 'Capacitive'
+            val = get_val(latest_df, coords['finger_id'], 'Capacitive')
             data_press.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
     
         # 3. Resistive Force (New)
