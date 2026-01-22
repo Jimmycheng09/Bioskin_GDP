@@ -10,7 +10,7 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRzNUEwTvcdaOms8gu9
 # --- 1. CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Mixed Sensor Dashboard")
 st.title("🖐️ Mixed Sensor Dashboard")
-st.markdown("Visualising **Temperature**, **Force (Capacitive)**, and **Resistive Force** on a single hand.")
+st.markdown("Visualising **Temperature** and **Force (Capacitive & Resistive)** on a single hand.")
 
 # Custom CSS
 st.markdown("""
