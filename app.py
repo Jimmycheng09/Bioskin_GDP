@@ -43,7 +43,7 @@ HAND_OUTLINE_Y = [
 
 # --- 3. SENSOR DEFINITIONS (FIXED) ---
 TEMP_SENSORS = {
-    'Temp': {'x': 3.1, 'y': 6.5}
+    'Force (Resistive)': {'x': 4.4, 'y': 6.5} 
 }
 
 PRESSURE_SENSORS = {
@@ -52,7 +52,7 @@ PRESSURE_SENSORS = {
 
 # Added missing dictionary for Resistive Sensors
 RESISTIVE_SENSORS = {
-    'Force (Resistive)':  {'x': 4.4, 'y': 6.5} 
+    'Temp':  {'x': 3.1, 'y': 6.5}
 }
 
 # --- 4. DATA GENERATION ---
