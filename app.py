@@ -70,7 +70,8 @@ def get_data():
     raw_data = sheet.get_all_values()
     df = pd.DataFrame(raw_data[1:], columns=raw_data[0]) 
     cols_to_num = ['Date and Time', 'Finger Number', 'Temperature', 'Capacitive', 'Resistive', 'Timestamp']
-        for col in cols_to_num:
+    for col in cols_to_num:
+        if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
     latest_df = df.groupby('Finger Number').tail(1).set_index('Finger Number')
             
