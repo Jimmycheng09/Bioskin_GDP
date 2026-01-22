@@ -57,7 +57,6 @@ RESISTIVE_SENSORS = {
     'Temp': {'x': 4.4, 'y': 6.5, 'finger_id' : 4}
 }
 
-@st.cache_data(ttl=3)
 # --- 4. DATA GENERATION ---
 def get_data():
 
