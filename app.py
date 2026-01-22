@@ -7,7 +7,6 @@ import io
 import datetime
 
 # --- 1. CONFIGURATION ---
-# Base URL (We will add a random number to this later to force updates)
 BASE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRzNUEwTvcdaOms8gu9f9zwVMGRztyOzc1JQ2vG9jc1RjTYhpRS9b2P8KWEEp7GjWJRvtURMhhQtKvj/pub?gid=0&single=true&output=csv"
 
 st.set_page_config(layout="wide", page_title="Mixed Sensor Dashboard")
@@ -46,7 +45,6 @@ HAND_OUTLINE_Y = [
 ]
 
 # --- 3. SENSOR DEFINITIONS ---
-# Ensure these IDs match your 'Finger Number' column
 RESISTIVE_SENSORS = {
     'Force (Resistive)': {'x': 3.1, 'y': 6.5, 'finger_id' : 4}
 }
@@ -58,13 +56,18 @@ TEMP_SENSORS = {
 }
 
 # --- 4. DATA GENERATION ---
-# Removed @st.cache_data to force fresh fetch every time
 def get_data():
     try:
-        # CACHE BUSTING: Add a random timestamp to URL to prevent caching
+        # Cache Busting
         unique_url = f"{BASE_SHEET_URL}&t={int(time.time())}"
         
-        df = pd.read_csv(unique_url) 
+        # --- THE FIX: Load all data, but slice IMMEDIATELY to last 5 rows ---
+        # Note: We can't use 'skiprows' easily with GSheets URL because header row varies
+        # So we read it, then tail(5) it immediately.
+        df = pd.read_csv(unique_url)
+        
+        # Only keep the last 5 rows to ensure we are looking at recent data
+        df = df.tail(5)
         
         # Clean Data
         cols_to_num = ['Finger Number', 'Temperature', 'Capacitive', 'Resistive']
@@ -72,20 +75,20 @@ def get_data():
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         
-        # Get latest
         if 'Finger Number' not in df.columns:
-            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Error: Column 'Finger Number' not found"
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Column 'Finger Number' missing"
             
+        # Group by Finger Number and get the single latest entry for each finger
+        # This prevents "looping" duplicates
         latest_df = df.groupby('Finger Number').tail(1).set_index('Finger Number')
         
-        # Extract Values
         data_temp, data_press, data_resistive = [], [], []
 
         def get_val(df, finger_id, col_name):
             if df.empty or finger_id not in df.index: return 0.0
             return float(df.loc[finger_id, col_name])
 
-        # Map Sensors
+        # Map Sensors (No outer loop here!)
         for name, coords in TEMP_SENSORS.items():
             val = get_val(latest_df, coords['finger_id'], 'Temperature')
             data_temp.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
@@ -170,16 +173,11 @@ dl_btn_spot = st.sidebar.empty()
 last_update_spot = st.sidebar.empty()
 
 while True:
-    # Fetch Data
     df_temp, df_press, df_resistive, error_msg = get_data()
-    
     unique_key = int(time.time() * 1000)
     current_time = datetime.datetime.now().strftime("%H:%M:%S")
-    
-    # Update Timestamp in Sidebar
     last_update_spot.markdown(f"**Last Fetch:** {current_time}")
 
-    # Download Button
     excel_data = convert_to_excel(df_temp, df_press, df_resistive)
     dl_btn_spot.download_button(
         label="📥 Download Excel",
@@ -191,11 +189,9 @@ while True:
 
     with placeholder.container():
         if error_msg:
-            st.error(f"⚠️ Error fetching data: {error_msg}")
-            st.warning("Note: Google Sheets 'Publish to Web' updates every ~5 minutes. It is not instant.")
+            st.error(f"⚠️ Error: {error_msg}")
         else:
             c1, c2, c3 = st.columns(3)
-            
             val_t = f"{df_temp['Value'].mean():.1f} °C" if not df_temp.empty else "No Data"
             val_p = f"{df_press['Value'].mean():.1f} N" if not df_press.empty else "No Data"
             val_r = f"{df_resistive['Value'].mean():.1f} N" if not df_resistive.empty else "No Data"
