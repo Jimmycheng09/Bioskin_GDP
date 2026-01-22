@@ -44,7 +44,6 @@ HAND_OUTLINE_Y = [
 # --- 3. SENSOR DEFINITIONS ---
 TEMP_SENSORS = {
     'Force (resistive)':   {'x': 5.8, 'y': 4.5},
-    'Force (Cap)': {'x': 6.0, 'y': 6.2}
 }
 
 PRESSURE_SENSORS = {
