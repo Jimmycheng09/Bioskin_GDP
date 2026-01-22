@@ -60,7 +60,6 @@ RESISTIVE_SENSORS = {
 # --- 4. DATA GENERATION ---
 def get_data():
 
-    raw_data = sheet.get_all_values()
     df = pd.read_csv(SHEET_URL) 
     cols_to_num = ['Date and Time', 'Finger Number', 'Temperature', 'Capacitive', 'Resistive', 'Timestamp']
     for col in cols_to_num:
