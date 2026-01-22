@@ -58,41 +58,47 @@ TEMP_SENSORS = {
 }
 
 @st.cache_data(ttl=1)
-# --- 4. DATA GENERATION ---
 def get_data():
+    # 1. READ DATA
+    try:
+        df = pd.read_csv(SHEET_URL) 
+        cols_to_num = ['Finger Number', 'Temperature', 'Capacitive', 'Resistive']
+        for col in cols_to_num:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # This correctly gets the single latest row for each finger ID
+        latest_df = df.groupby('Finger Number').tail(1).set_index('Finger Number')
+    except Exception:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-    df = pd.read_csv(SHEET_URL) 
-    cols_to_num = ['Date and Time', 'Finger Number', 'Temperature', 'Capacitive', 'Resistive', 'Timestamp']
-    for col in cols_to_num:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-    latest_df = df.groupby('Finger Number').tail(1).set_index('Finger Number')
-            
     data_temp = []
     data_press = []
-    data_resistive = [] # New list
+    data_resistive = [] 
 
+    # Helper function to look up data by ID
     def get_val(df, finger_id, col_name):
         if df.empty or finger_id not in df.index:
             return 0.0
         return float(df.loc[finger_id, col_name])
 
-    t = time.time() 
-    for _, row in latest_df.iterrows():
-        # 1. Temperature
-        for name, coords in TEMP_SENSORS.items():
-            val = get_val(latest_df, coords['finger_id'], 'Temperature')
-            data_temp.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
+    # --- THE FIX: REMOVED THE OUTER LOOP HERE ---
+    # We just loop through our defined sensors once.
     
-        # 2. Force (Capacitive)
-        for name, coords in PRESSURE_SENSORS.items():
-            val = get_val(latest_df, coords['finger_id'], 'Capacitive')
-            data_press.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
-    
-        # 3. Resistive Force (New)
-        for name, coords in RESISTIVE_SENSORS.items():
-            val = get_val(latest_df, coords['finger_id'], 'Resistive')
-            data_resistive.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
+    # 1. Temperature
+    for name, coords in TEMP_SENSORS.items():
+        val = get_val(latest_df, coords['finger_id'], 'Temperature')
+        data_temp.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
+
+    # 2. Force (Capacitive)
+    for name, coords in PRESSURE_SENSORS.items():
+        val = get_val(latest_df, coords['finger_id'], 'Capacitive')
+        data_press.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
+
+    # 3. Resistive Force
+    for name, coords in RESISTIVE_SENSORS.items():
+        val = get_val(latest_df, coords['finger_id'], 'Resistive')
+        data_resistive.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
           
     return pd.DataFrame(data_temp), pd.DataFrame(data_press), pd.DataFrame(data_resistive)
 
