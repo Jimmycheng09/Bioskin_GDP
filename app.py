@@ -190,7 +190,7 @@ def create_combined_chart(df_temp, df_press, df_resistive):
                 ),
                 opacity=0.9, line=dict(width=2, color='black') 
             ),
-            hovertemplate="<b>%{text}</b><br>Resistive: %{marker.color:.1f}<extra></extra>",
+            hovertemplate="<b>%{text}</b><br>Force: %{marker.color:.1f}<extra></extra>",
             showlegend=False
         ))
 
