@@ -8,7 +8,7 @@ import io
 # --- 1. CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Mixed Sensor Dashboard")
 st.title("🖐️ Mixed Sensor Dashboard")
-st.markdown("Visualizing **Temperature** and **Pressure** on a single hand.")
+st.markdown("Visualising **Temperature** and **Pressure** on a single hand.")
 
 # Custom CSS
 st.markdown("""
@@ -203,11 +203,11 @@ while True:
         c1, c2 = st.columns(2)
         if not df_temp.empty:
             avg_t = df_temp['Value'].mean()
-            c1.metric("Avg Temp", f"{avg_t:.1f} °C")
+            c1.metric("Temp", f"{avg_t:.1f} °C")
       
         if not df_press.empty:
             avg_p = df_press['Value'].mean()
-            c2.metric("Avg Pressure", f"{avg_p:.1f}")
+            c2.metric("Capacitive Force Sensor", f"{avg_p:.1f}") #Resistive force sensor
         st.divider()
 
         # Single Combined Chart
