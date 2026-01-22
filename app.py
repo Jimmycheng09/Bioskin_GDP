@@ -55,30 +55,37 @@ TEMP_SENSORS = {
     'Temp': {'x': 4.4, 'y': 6.5, 'finger_id' : 3}
 }
 
-# --- 4. DATA GENERATION (Returns Visualization Data AND Full History) ---
+# --- 4. DATA GENERATION ---
 def get_data():
     try:
         unique_url = f"{BASE_SHEET_URL}&t={int(time.time())}"
         
-        # 1. Read the FULL data first
+        # 1. FETCH FULL DATA (For Download)
         full_df = pd.read_csv(unique_url)
         
         if full_df.empty:
-            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Google Sheet is empty", pd.DataFrame()
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Google Sheet is empty", pd.DataFrame(), pd.DataFrame()
 
-        # 2. Clean Data (Apply this to the FULL dataset so the download is clean)
+        # Clean Column Names (strip whitespace)
+        full_df.columns = full_df.columns.str.strip()
+
+        # Convert to Numeric
         cols_to_num = ['Finger Number', 'Temperature', 'Capacitive', 'Resistive']
         for col in cols_to_num:
             if col in full_df.columns:
                 full_df[col] = pd.to_numeric(full_df[col], errors='coerce')
-        
-        if 'Finger Number' not in full_df.columns:
-            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Column 'Finger Number' missing", full_df
 
-        # 3. Create the Visualization Slice (Last 5 Rows)
-        vis_df = full_df.tail(5)
+        if 'Finger Number' not in full_df.columns:
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Column 'Finger Number' missing", full_df, pd.DataFrame()
+
+        # 2. CREATE VISUALIZATION SLICE (Strictly Last 5 Valid Rows)
+        # Drop rows where Finger Number is NaN (this fixes the "ghost row" loop issue)
+        clean_df = full_df.dropna(subset=['Finger Number'])
         
-        # Prevent Looping in Vis: Group by Finger Number and keep only the latest
+        # Take the last 5 VALID rows
+        vis_df = clean_df.tail(5)
+        
+        # Final Duplicate Filter: Keep only the latest entry per Finger ID found in those 5 rows
         latest_df = vis_df.groupby('Finger Number').tail(1).set_index('Finger Number')
         
         data_temp, data_press, data_resistive = [], [], []
@@ -99,20 +106,19 @@ def get_data():
             val = get_val(latest_df, coords['finger_id'], 'Resistive')
             data_resistive.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
             
-        # Return: Vis Temp, Vis Press, Vis Res, Error, AND THE FULL DATAFRAME
-        return pd.DataFrame(data_temp), pd.DataFrame(data_press), pd.DataFrame(data_resistive), None, full_df
+        # Returns: VisTemp, VisPress, VisRes, Error, FullHistory(for Excel), VisDebug(for User to check)
+        return pd.DataFrame(data_temp), pd.DataFrame(data_press), pd.DataFrame(data_resistive), None, full_df, vis_df
 
     except Exception as e:
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), str(e), pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), str(e), pd.DataFrame(), pd.DataFrame()
 
-# --- EXCEL CONVERTER (Takes the FULL DataFrame now) ---
+# --- EXCEL CONVERTER ---
 def convert_to_excel(full_df):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         if not full_df.empty:
             full_df.to_excel(writer, index=False, sheet_name='Full_Sensor_History')
         else:
-            # Create dummy sheet if empty
             pd.DataFrame(['No Data']).to_excel(writer, sheet_name='Empty')
     return output.getvalue()
 
@@ -173,20 +179,27 @@ def create_combined_chart(df_temp, df_press, df_resistive):
 placeholder = st.empty()
 dl_btn_spot = st.sidebar.empty()
 last_update_spot = st.sidebar.empty()
+debug_expander = st.sidebar.expander("🛠️ Debug: See Raw Data", expanded=False)
 
 while True:
-    # UPDATED: Now unpacks the 5th return value (full_df)
-    df_temp, df_press, df_resistive, error_msg, full_df = get_data()
+    # UPDATED: Returns 6 items now
+    df_temp, df_press, df_resistive, error_msg, full_df, vis_debug_df = get_data()
     
     unique_key = int(time.time() * 1000)
     current_time = datetime.datetime.now().strftime("%H:%M:%S")
     last_update_spot.markdown(f"**Last Fetch:** {current_time}")
 
-    # --- EXCEL DOWNLOAD (Uses full_df now) ---
+    # --- SHOW DEBUG DATA ---
+    with debug_expander:
+        if not vis_debug_df.empty:
+            st.write("**This is what the chart sees (Last 5 Valid Rows):**")
+            st.dataframe(vis_debug_df)
+        else:
+            st.write("No valid data rows found.")
+
+    # --- EXCEL DOWNLOAD (Uses Full History) ---
     try:
-        # Convert the FULL data history to Excel
         excel_data = convert_to_excel(full_df)
-        
         dl_btn_spot.download_button(
             label="📥 Download Full History",
             data=excel_data,
@@ -198,8 +211,8 @@ while True:
         st.sidebar.error("Function 'convert_to_excel' missing.")
     except Exception as e:
         st.sidebar.warning(f"Download unavailable: {e}")
-    # -----------------------------
 
+    # --- MAIN UI ---
     with placeholder.container():
         if error_msg:
             st.error(f"⚠️ Error: {error_msg}")
