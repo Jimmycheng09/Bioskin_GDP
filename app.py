@@ -47,12 +47,12 @@ TEMP_SENSORS = {
 }
 
 PRESSURE_SENSORS = {
-    'Force (Capacitive)':  {'x': 4.8, 'y': 6.5} 
+    'Force (Capacitive)':  {'x': 3.1, 'y': 8.5} 
 }
 
 # Added missing dictionary for Resistive Sensors
 RESISTIVE_SENSORS = {
-    'Force (Resistive)':  {'x': 5.8, 'y': 6.5} 
+    'Force (Resistive)':  {'x': 3.9, 'y': 6.5} 
 }
 
 # --- 4. DATA GENERATION ---
