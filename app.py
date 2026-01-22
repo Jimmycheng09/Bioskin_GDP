@@ -68,7 +68,6 @@ def get_data():
             df[col] = pd.to_numeric(df[col], errors='coerce')
     latest_df = df.groupby('Finger Number').tail(1).set_index('Finger Number')
             
-    """Generates random data for 3 specific sensor types."""
     data_temp = []
     data_press = []
     data_resistive = [] # New list
