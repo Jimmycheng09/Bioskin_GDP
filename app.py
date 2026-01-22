@@ -47,7 +47,7 @@ TEMP_SENSORS = {
 }
 
 PRESSURE_SENSORS = {
-    'Force (Capacitive)':  {'x': 3.1, 'y': 4.5} 
+    'Force (Capacitive)':  {'x': 4.4, 'y': 4.5} 
 }
 
 # Added missing dictionary for Resistive Sensors
