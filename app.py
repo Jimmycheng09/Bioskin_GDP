@@ -43,18 +43,15 @@ HAND_OUTLINE_Y = [
 
 # --- 3. SENSOR DEFINITIONS ---
 TEMP_SENSORS = {
-    'Middle':   {'x': 4.5, 'y': 7.0},
-    'Ring Tip': {'x': 6.0, 'y': 6.2}
+    'Force (resistive)':   {'x': 5.8, 'y': 4.5},
+    'Force (Cap)': {'x': 6.0, 'y': 6.2}
 }
 
 PRESSURE_SENSORS = {
-    'Ring Base': {'x': 5.8, 'y': 4.5}
+    'Temp':   {'x': 4.5, 'y': 7.0},
+    'Force (Cap)': {'x': 6.0, 'y': 6.2}
 }
 
-# --- NEW: 3rd Sensor Type ---
-RESISTIVE_SENSORS = {
-    'Index Tip': {'x': 3.1, 'y': 6.5} 
-}
 
 # --- 4. DATA GENERATION ---
 def get_data():
