@@ -203,11 +203,11 @@ while True:
         c1, c2 = st.columns(2)
         if not df_temp.empty:
             avg_t = df_temp['Value'].mean()
-            c1.metric("Temp", f"{avg_t:.1f} °C")
+            c1.metric("Temp Sensor", f"{avg_t:.1f} °C")
       
         if not df_press.empty:
             avg_p = df_press['Value'].mean()
-            c2.metric("Capacitive Force Sensor", f"{avg_p:.1f}") #Resistive force sensor
+            c2.metric("Force Sensor", f"{avg_p:.1f}") #Resistive force sensor & Capacitive
         st.divider()
 
         # Single Combined Chart
