@@ -175,29 +175,77 @@ def create_combined_chart(df_temp, df_press, df_resistive):
     )
     return fig
 
-# --- 6. MAIN LOOP ---
+# --- 6. MAIN LOOP (WITH ANTI-JITTER) ---
 placeholder = st.empty()
 dl_btn_spot = st.sidebar.empty()
 last_update_spot = st.sidebar.empty()
-debug_expander = st.sidebar.expander("🛠️ Debug: See Raw Data", expanded=False)
+debug_expander = st.sidebar.expander("🛠️ Debug: See Raw Data", expanded=True)
+
+# Initialize Session State to track the "High Water Mark" of your data
+if 'max_index_seen' not in st.session_state:
+    st.session_state.max_index_seen = -1
+if 'last_valid_vis_df' not in st.session_state:
+    st.session_state.last_valid_vis_df = pd.DataFrame()
 
 while True:
-    # UPDATED: Returns 6 items now
-    df_temp, df_press, df_resistive, error_msg, full_df, vis_debug_df = get_data()
+    # 1. Fetch Fresh Data
+    df_temp, df_press, df_resistive, error_msg, full_df, raw_slice_df = get_data()
     
     unique_key = int(time.time() * 1000)
     current_time = datetime.datetime.now().strftime("%H:%M:%S")
-    last_update_spot.markdown(f"**Last Fetch:** {current_time}")
 
-    # --- SHOW DEBUG DATA ---
-    with debug_expander:
-        if not vis_debug_df.empty:
-            st.write("**This is what the chart sees (Last 5 Valid Rows):**")
-            st.dataframe(vis_debug_df)
+    # 2. ANTI-JITTER LOGIC
+    # We check the highest index number in the new data.
+    if not full_df.empty and 'Finger Number' in full_df.columns:
+        # Get the highest row number (index) in this new batch
+        current_max_index = full_df.index.max()
+        
+        # If this batch is "older" than what we've already seen, it's a glitch. Ignore it.
+        if current_max_index < st.session_state.max_index_seen:
+            # OPTIONAL: Show a tiny warning that we skipped a glitch frame
+            # last_update_spot.warning(f"Skipped Stale Data (Row {current_max_index} < {st.session_state.max_index_seen})")
+            
+            # Use the PREVIOUS valid data instead of this broken batch
+            if not st.session_state.last_valid_vis_df.empty:
+                # Re-calculate the sensor values using the SAVED data
+                latest_df = st.session_state.last_valid_vis_df
+                
+                # Re-map the sensors using the OLD valid data to prevent the dashboard from blanking out
+                # (This effectively "freezes" the screen until valid data returns)
+                data_temp, data_press, data_resistive = [], [], []
+                def get_val(df, finger_id, col_name):
+                    if df.empty or finger_id not in df.index: return 0.0
+                    return float(df.loc[finger_id, col_name])
+
+                for name, coords in TEMP_SENSORS.items():
+                    val = get_val(latest_df, coords['finger_id'], 'Temperature')
+                    data_temp.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
+
+                for name, coords in PRESSURE_SENSORS.items():
+                    val = get_val(latest_df, coords['finger_id'], 'Capacitive')
+                    data_press.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
+
+                for name, coords in RESISTIVE_SENSORS.items():
+                    val = get_val(latest_df, coords['finger_id'], 'Resistive')
+                    data_resistive.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
+                    
+                df_temp = pd.DataFrame(data_temp)
+                df_press = pd.DataFrame(data_press)
+                df_resistive = pd.DataFrame(data_resistive)
         else:
-            st.write("No valid data rows found.")
+            # This is GOOD new data (or equal to current). Update our "High Water Mark".
+            st.session_state.max_index_seen = current_max_index
+            
+            # Save the processed "Last 5" slice for next time
+            # We need to recreate the 'latest_df' logic here to save it
+            clean_df = full_df.dropna(subset=['Finger Number'])
+            vis_df_slice = clean_df.tail(5)
+            latest_grouped = vis_df_slice.groupby('Finger Number').tail(1).set_index('Finger Number')
+            st.session_state.last_valid_vis_df = latest_grouped
+            
+            last_update_spot.markdown(f"**Last Fetch:** {current_time} (Row {current_max_index})")
 
-    # --- EXCEL DOWNLOAD (Uses Full History) ---
+    # --- EXCEL DOWNLOAD ---
     try:
         excel_data = convert_to_excel(full_df)
         dl_btn_spot.download_button(
@@ -207,14 +255,18 @@ while True:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key=f"dl_{unique_key}"
         )
-    except NameError:
-        st.sidebar.error("Function 'convert_to_excel' missing.")
-    except Exception as e:
-        st.sidebar.warning(f"Download unavailable: {e}")
+    except:
+        pass
+
+    # --- SHOW DEBUG ---
+    with debug_expander:
+        st.write(f"**Current Max Index:** {st.session_state.max_index_seen}")
+        if not raw_slice_df.empty:
+            st.dataframe(raw_slice_df)
 
     # --- MAIN UI ---
     with placeholder.container():
-        if error_msg:
+        if error_msg and error_msg != "Google Sheet is empty":
             st.error(f"⚠️ Error: {error_msg}")
         else:
             c1, c2, c3 = st.columns(3)
