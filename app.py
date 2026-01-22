@@ -108,6 +108,7 @@ def get_data():
 
 def convert_to_excel(df_t, df_p, df_r):
     output = io.BytesIO()
+    # "openpyxl" must be installed in your environment/requirements.txt
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         if not df_t.empty: df_t.to_excel(writer, index=False, sheet_name='Temperature')
         if not df_p.empty: df_p.to_excel(writer, index=False, sheet_name='Force_Capacitive')
@@ -178,20 +179,29 @@ while True:
     current_time = datetime.datetime.now().strftime("%H:%M:%S")
     last_update_spot.markdown(f"**Last Fetch:** {current_time}")
 
-    excel_data = convert_to_excel(df_temp, df_press, df_resistive)
-    dl_btn_spot.download_button(
-        label="📥 Download Excel",
-        data=excel_data,
-        file_name=f"mixed_sensor_data_{unique_key}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        key=f"dl_{unique_key}"
-    )
+    # --- SAFE EXCEL GENERATION ---
+    # This prevents the app from crashing if 'convert_to_excel' fails
+    try:
+        excel_data = convert_to_excel(df_temp, df_press, df_resistive)
+        dl_btn_spot.download_button(
+            label="📥 Download Excel",
+            data=excel_data,
+            file_name=f"mixed_sensor_data_{unique_key}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"dl_{unique_key}"
+        )
+    except NameError:
+        st.sidebar.error("Function 'convert_to_excel' missing.")
+    except Exception as e:
+        st.sidebar.warning(f"Download unavailable: {e}")
+    # -----------------------------
 
     with placeholder.container():
         if error_msg:
             st.error(f"⚠️ Error: {error_msg}")
         else:
             c1, c2, c3 = st.columns(3)
+            # Safe mean calculation (handles empty dataframes gracefully)
             val_t = f"{df_temp['Value'].mean():.1f} °C" if not df_temp.empty else "No Data"
             val_p = f"{df_press['Value'].mean():.1f} N" if not df_press.empty else "No Data"
             val_r = f"{df_resistive['Value'].mean():.1f} N" if not df_resistive.empty else "No Data"
