@@ -45,7 +45,7 @@ HAND_OUTLINE_Y = [
 
 # --- 3. SENSOR DEFINITIONS (FIXED) ---
 RESISTIVE_SENSORS = {
-    'Force (Resistive)': {'x': 3.1, 'y': 6.5, 'finger_id' : 3}
+    'Force (Resistive)': {'x': 3.1, 'y': 6.5, 'finger_id' : 4}
 }
 
 PRESSURE_SENSORS = {
@@ -54,7 +54,7 @@ PRESSURE_SENSORS = {
 
 # Added missing dictionary for Resistive Sensors
 TEMP_SENSORS = {
-    'Temp': {'x': 4.4, 'y': 6.5, 'finger_id' : 4}
+    'Temp': {'x': 4.4, 'y': 6.5, 'finger_id' : 2}
 }
 
 @st.cache_data(ttl=3)
