@@ -3,6 +3,7 @@
 # Bioskin Mixed Sensor Dashboard
 
 A real-time visualization dashboard designed to monitor biosensor data from a smart glove or prosthetic hand. This application fetches live data from a Google Sheet and visualizes Temperature, Capacitive Force, and Resistive Force on a mapped hand topology.
+(links = https://bioskingdp.streamlit.app/ )
 
 ## Features
 - **Live Monitoring:** Fetches sensor data every 2 seconds from a Google Sheet CSV feed.
