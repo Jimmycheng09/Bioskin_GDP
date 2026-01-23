@@ -282,4 +282,4 @@ while True:
             fig = create_combined_chart(df_temp, df_press, df_resistive)
             st.plotly_chart(fig, use_container_width=True, key=f"main_chart_{unique_key}")
 
-    time.sleep(4)
+    time.sleep(1)
