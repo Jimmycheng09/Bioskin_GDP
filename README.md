@@ -57,5 +57,4 @@ The dashboard will open automatically in your web browser at http://localhost:85
 This repository connects to a Google Sheet via a public CSV link.
 DO NOT upload/commit any "service_account.json" files or private API keys to this repository. All authentication should be handled locally or via environment variables.
 
-## License
-[Your License Here, e.g., MIT License]
+
