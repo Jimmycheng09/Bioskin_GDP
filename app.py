@@ -273,8 +273,8 @@ while True:
         else:
             c1, c2, c3 = st.columns(3)
             val_t = f"{df_temp['Value'].mean():.1f} °C" if not df_temp.empty else "No Data"
-            val_p = f"{df_press['Value'].mean():.1f} N" if not df_press.empty else "No Data"
-            val_r = f"{df_resistive['Value'].mean():.1f} N" if not df_resistive.empty else "No Data"
+            val_p = f"{df_press['Value'].mean():.1f} " if not df_press.empty else "No Data"
+            val_r = f"{df_resistive['Value'].mean():.1f} " if not df_resistive.empty else "No Data"
 
             c1.metric("Temp Sensor", val_t)
             c2.metric("Force (Cap)", val_p)
