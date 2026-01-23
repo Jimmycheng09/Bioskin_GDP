@@ -236,7 +236,7 @@ while True:
             
             # Save this good data for next time
             clean_df = full_df.dropna(subset=['Finger Number'])
-            vis_df_slice = clean_df.tail(50) # Buffer of 50
+            vis_df_slice = clean_df.tail(10) # Buffer of 50
             latest_grouped = vis_df_slice.groupby('Finger Number').tail(1).set_index('Finger Number')
             st.session_state.last_valid_vis_df = latest_grouped
             
