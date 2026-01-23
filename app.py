@@ -46,13 +46,13 @@ HAND_OUTLINE_Y = [
 
 # --- 3. SENSOR DEFINITIONS ---
 RESISTIVE_SENSORS = {
-    'Force (Resistive)': {'x': 3.1, 'y': 6.5, 'finger_id' : 4}
+    'Force (Resistive)': {'x': 3.1, 'y': 6.5, 'finger_id' : 3}
 }
 PRESSURE_SENSORS = {
-    'Force (Capacitive)':  {'x': 4.4, 'y': 4.5, 'finger_id' : 3} 
+    'Force (Capacitive)':  {'x': 4.4, 'y': 4.5, 'finger_id' : 2} 
 }
 TEMP_SENSORS = {
-    'Temp': {'x': 4.4, 'y': 6.5, 'finger_id' : 3}
+    'Temp': {'x': 4.4, 'y': 6.5, 'finger_id' : 2}
 }
 
 # --- 4. DATA GENERATION ---
