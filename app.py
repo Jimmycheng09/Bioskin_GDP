@@ -149,7 +149,7 @@ def create_combined_chart(df_temp, df_press, df_resistive):
         fig.add_trace(go.Scatter(
             x=df_press['X'], y=df_press['Y'], mode='markers+text',
             text=df_press['Sensor'], textposition="bottom center", 
-            marker=dict(size=50, symbol='circle', color=df_press['Value'], colorscale='RdBu_r', cmin=0, cmax=50, showscale=True,
+            marker=dict(size=50, symbol='circle', color=df_press['Value'], colorscale='RdBu_r', cmin=1130, cmax=1600, showscale=True,
                         colorbar=dict(title="Force (Cap)", orientation='h', y=-0.40, x=0.5, len=0.9, thickness=15),
                         opacity=0.9, line=dict(width=2, color='yellow')),
             hovertemplate="<b>%{text}</b><br>Force: %{marker.color:.1f}<extra></extra>"
@@ -160,7 +160,7 @@ def create_combined_chart(df_temp, df_press, df_resistive):
         fig.add_trace(go.Scatter(
             x=df_resistive['X'], y=df_resistive['Y'], mode='markers+text',
             text=df_resistive['Sensor'], textposition="bottom center", 
-            marker=dict(size=50, symbol='square', color=df_resistive['Value'], colorscale='RdBu_r', cmin=0, cmax=100, showscale=True,
+            marker=dict(size=50, symbol='square', color=df_resistive['Value'], colorscale='RdBu_r', cmin=0, cmax=500, showscale=True,
                         colorbar=dict(title="Force (Res)", orientation='h', y=-0.60, x=0.5, len=0.9, thickness=15),
                         opacity=0.9, line=dict(width=2, color='black')),
             hovertemplate="<b>%{text}</b><br>Resistive: %{marker.color:.1f}<extra></extra>"
