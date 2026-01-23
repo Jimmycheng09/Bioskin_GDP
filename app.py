@@ -175,43 +175,45 @@ def create_combined_chart(df_temp, df_press, df_resistive):
     )
     return fig
 
-# --- 6. MAIN LOOP (WITH ANTI-JITTER) ---
+# --- 6. MAIN LOOP (WITH RESET BUTTON) ---
 placeholder = st.empty()
 dl_btn_spot = st.sidebar.empty()
 last_update_spot = st.sidebar.empty()
 debug_expander = st.sidebar.expander("🛠️ Debug: See Raw Data", expanded=True)
 
-# Initialize Session State to track the "High Water Mark" of your data
+# --- RESET BUTTON ---
+if st.sidebar.button("🔄 Reset / Unfreeze Dashboard"):
+    st.session_state.max_index_seen = -1
+    st.session_state.last_valid_vis_df = pd.DataFrame()
+    st.rerun()
+
+# Initialize Session State
 if 'max_index_seen' not in st.session_state:
     st.session_state.max_index_seen = -1
 if 'last_valid_vis_df' not in st.session_state:
     st.session_state.last_valid_vis_df = pd.DataFrame()
 
 while True:
-    # 1. Fetch Fresh Data
+    # 1. Fetch Fresh Data (Unpacking the 6 items)
     df_temp, df_press, df_resistive, error_msg, full_df, raw_slice_df = get_data()
     
     unique_key = int(time.time() * 1000)
     current_time = datetime.datetime.now().strftime("%H:%M:%S")
 
     # 2. ANTI-JITTER LOGIC
-    # We check the highest index number in the new data.
     if not full_df.empty and 'Finger Number' in full_df.columns:
-        # Get the highest row number (index) in this new batch
         current_max_index = full_df.index.max()
         
-        # If this batch is "older" than what we've already seen, it's a glitch. Ignore it.
+        # LOGIC: Only update if new rows are found OR if we just reset (-1)
         if current_max_index < st.session_state.max_index_seen:
-            # OPTIONAL: Show a tiny warning that we skipped a glitch frame
-            # last_update_spot.warning(f"Skipped Stale Data (Row {current_max_index} < {st.session_state.max_index_seen})")
+            # OPTIONAL: Show a warning so you know it's ignoring data
+            # last_update_spot.warning(f"Ignored Stale Data (Row {current_max_index} < {st.session_state.max_index_seen})")
             
-            # Use the PREVIOUS valid data instead of this broken batch
+            # Use OLD data
             if not st.session_state.last_valid_vis_df.empty:
-                # Re-calculate the sensor values using the SAVED data
                 latest_df = st.session_state.last_valid_vis_df
                 
-                # Re-map the sensors using the OLD valid data to prevent the dashboard from blanking out
-                # (This effectively "freezes" the screen until valid data returns)
+                # Re-map sensors using OLD data
                 data_temp, data_press, data_resistive = [], [], []
                 def get_val(df, finger_id, col_name):
                     if df.empty or finger_id not in df.index: return 0.0
@@ -220,11 +222,9 @@ while True:
                 for name, coords in TEMP_SENSORS.items():
                     val = get_val(latest_df, coords['finger_id'], 'Temperature')
                     data_temp.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
-
                 for name, coords in PRESSURE_SENSORS.items():
                     val = get_val(latest_df, coords['finger_id'], 'Capacitive')
                     data_press.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
-
                 for name, coords in RESISTIVE_SENSORS.items():
                     val = get_val(latest_df, coords['finger_id'], 'Resistive')
                     data_resistive.append({'Sensor': name, 'X': coords['x'], 'Y': coords['y'], 'Value': val})
@@ -233,13 +233,14 @@ while True:
                 df_press = pd.DataFrame(data_press)
                 df_resistive = pd.DataFrame(data_resistive)
         else:
-            # This is GOOD new data (or equal to current). Update our "High Water Mark".
+            # NEW DATA FOUND
             st.session_state.max_index_seen = current_max_index
             
-            # Save the processed "Last 5" slice for next time
-            # We need to recreate the 'latest_df' logic here to save it
+            # Save the processed slice logic
             clean_df = full_df.dropna(subset=['Finger Number'])
-            vis_df_slice = clean_df.tail(5)
+            
+            # --- CRITICAL: Use the larger buffer (50) here too ---
+            vis_df_slice = clean_df.tail(50)
             latest_grouped = vis_df_slice.groupby('Finger Number').tail(1).set_index('Finger Number')
             st.session_state.last_valid_vis_df = latest_grouped
             
@@ -251,7 +252,7 @@ while True:
         dl_btn_spot.download_button(
             label="📥 Download Full History",
             data=excel_data,
-            file_name=f"full_sensor_history_{unique_key}.xlsx",
+            file_name=f"full_sensor_data_{unique_key}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key=f"dl_{unique_key}"
         )
@@ -260,7 +261,8 @@ while True:
 
     # --- SHOW DEBUG ---
     with debug_expander:
-        st.write(f"**Current Max Index:** {st.session_state.max_index_seen}")
+        st.write(f"**Highest Row Seen:** {st.session_state.max_index_seen}")
+        st.write(f"**Current Sheet Max Row:** {full_df.index.max() if not full_df.empty else 0}")
         if not raw_slice_df.empty:
             st.dataframe(raw_slice_df)
 
@@ -271,8 +273,8 @@ while True:
         else:
             c1, c2, c3 = st.columns(3)
             val_t = f"{df_temp['Value'].mean():.1f} °C" if not df_temp.empty else "No Data"
-            val_p = f"{df_press['Value'].mean():.1f} " if not df_press.empty else "No Data"
-            val_r = f"{df_resistive['Value'].mean():.1f} " if not df_resistive.empty else "No Data"
+            val_p = f"{df_press['Value'].mean():.1f} N" if not df_press.empty else "No Data"
+            val_r = f"{df_resistive['Value'].mean():.1f} N" if not df_resistive.empty else "No Data"
 
             c1.metric("Temp Sensor", val_t)
             c2.metric("Force (Cap)", val_p)
@@ -283,4 +285,4 @@ while True:
             fig = create_combined_chart(df_temp, df_press, df_resistive)
             st.plotly_chart(fig, use_container_width=True, key=f"main_chart_{unique_key}")
 
-    time.sleep(3)
+    time.sleep(2)
