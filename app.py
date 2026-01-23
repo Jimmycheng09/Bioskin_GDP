@@ -175,14 +175,14 @@ def create_combined_chart(df_temp, df_press, df_resistive):
     )
     return fig
 
-# --- 6. MAIN LOOP (WITH RESET BUTTON) ---
+# --- 6. MAIN LOOP ---
 placeholder = st.empty()
 dl_btn_spot = st.sidebar.empty()
 last_update_spot = st.sidebar.empty()
-debug_expander = st.sidebar.expander("🛠️ Debug: See Raw Data", expanded=True)
+debug_expander = st.sidebar.expander("🛠️ Debug: Raw Data from Google", expanded=True)
 
 # --- RESET BUTTON ---
-if st.sidebar.button("🔄 Reset / Unfreeze Dashboard"):
+if st.sidebar.button("🔄 Reset / Unfreeze"):
     st.session_state.max_index_seen = -1
     st.session_state.last_valid_vis_df = pd.DataFrame()
     st.rerun()
@@ -194,7 +194,7 @@ if 'last_valid_vis_df' not in st.session_state:
     st.session_state.last_valid_vis_df = pd.DataFrame()
 
 while True:
-    # 1. Fetch Fresh Data (Unpacking the 6 items)
+    # 1. Fetch Fresh Data
     df_temp, df_press, df_resistive, error_msg, full_df, raw_slice_df = get_data()
     
     unique_key = int(time.time() * 1000)
@@ -204,16 +204,14 @@ while True:
     if not full_df.empty and 'Finger Number' in full_df.columns:
         current_max_index = full_df.index.max()
         
-        # LOGIC: Only update if new rows are found OR if we just reset (-1)
+        # LOGIC: If the data Google sent is OLDER than what we saw before, it's a glitch.
         if current_max_index < st.session_state.max_index_seen:
-            # OPTIONAL: Show a warning so you know it's ignoring data
-            # last_update_spot.warning(f"Ignored Stale Data (Row {current_max_index} < {st.session_state.max_index_seen})")
-            
-            # Use OLD data
+            # The Debug section will show the OLD data to prove Google is lagging
+            # But we force the Dashboard to use the SAVED (newer) data
             if not st.session_state.last_valid_vis_df.empty:
                 latest_df = st.session_state.last_valid_vis_df
                 
-                # Re-map sensors using OLD data
+                # Re-calculate sensors using the SAVED good data
                 data_temp, data_press, data_resistive = [], [], []
                 def get_val(df, finger_id, col_name):
                     if df.empty or finger_id not in df.index: return 0.0
@@ -233,18 +231,16 @@ while True:
                 df_press = pd.DataFrame(data_press)
                 df_resistive = pd.DataFrame(data_resistive)
         else:
-            # NEW DATA FOUND
+            # NEW DATA FOUND (or same as before)
             st.session_state.max_index_seen = current_max_index
             
-            # Save the processed slice logic
+            # Save this good data for next time
             clean_df = full_df.dropna(subset=['Finger Number'])
-            
-            # --- CRITICAL: Use the larger buffer (50) here too ---
-            vis_df_slice = clean_df.tail(50)
+            vis_df_slice = clean_df.tail(50) # Buffer of 50
             latest_grouped = vis_df_slice.groupby('Finger Number').tail(1).set_index('Finger Number')
             st.session_state.last_valid_vis_df = latest_grouped
             
-            last_update_spot.markdown(f"**Last Fetch:** {current_time} (Row {current_max_index})")
+            last_update_spot.markdown(f"**Last Fetch:** {current_time}")
 
     # --- EXCEL DOWNLOAD ---
     try:
@@ -259,10 +255,10 @@ while True:
     except:
         pass
 
-    # --- SHOW DEBUG ---
+    # --- SHOW DEBUG (The Raw Truth) ---
     with debug_expander:
-        st.write(f"**Highest Row Seen:** {st.session_state.max_index_seen}")
-        st.write(f"**Current Sheet Max Row:** {full_df.index.max() if not full_df.empty else 0}")
+        st.write(f"**Highest Row We Have Ever Seen:** {st.session_state.max_index_seen}")
+        st.write(f"**Row Google Sent Just Now:** {full_df.index.max() if not full_df.empty else 0}")
         if not raw_slice_df.empty:
             st.dataframe(raw_slice_df)
 
@@ -272,9 +268,10 @@ while True:
             st.error(f"⚠️ Error: {error_msg}")
         else:
             c1, c2, c3 = st.columns(3)
+            # --- UPDATED: Removed "N" unit ---
             val_t = f"{df_temp['Value'].mean():.1f} °C" if not df_temp.empty else "No Data"
-            val_p = f"{df_press['Value'].mean():.1f} " if not df_press.empty else "No Data"
-            val_r = f"{df_resistive['Value'].mean():.1f} " if not df_resistive.empty else "No Data"
+            val_p = f"{df_press['Value'].mean():.1f}" if not df_press.empty else "No Data"
+            val_r = f"{df_resistive['Value'].mean():.1f}" if not df_resistive.empty else "No Data"
 
             c1.metric("Temp Sensor", val_t)
             c2.metric("Force (Cap)", val_p)
@@ -285,4 +282,4 @@ while True:
             fig = create_combined_chart(df_temp, df_press, df_resistive)
             st.plotly_chart(fig, use_container_width=True, key=f"main_chart_{unique_key}")
 
-    time.sleep(5)
+    time.sleep(4)
